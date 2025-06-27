@@ -1,23 +1,23 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import dynamic from "next/dynamic"
 import type { GeoJSON as GeoJSONType } from "geojson"
 import L from "leaflet"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import LocationInput from "@/components/location-input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Slider } from "@/components/ui/slider"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2, MapPin, AlertCircle } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import "leaflet/dist/leaflet.css"
 import { IntersectingIsochrone } from "@/lib/IntersectingIsochrone"
 import { TravelMode } from "@/types"
-import { featureCollection } from "@turf/turf"
 
 // Leaflet icon workaround for Next.js using CDN
 // @ts-ignore
@@ -33,11 +33,7 @@ L.Icon.Default.mergeOptions({
 })
 
 export default function IsochroneMapPage() {
-  const [locations, setLocations] = useState<string[]>([
-    "Stephansplatz 1, 1010 Wien",
-    "Westbahnhof, 1150 Wien",
-    "",
-  ])
+  const [locations, setLocations] = useState<string[]>([""])
   const [travelTime, setTravelTime] = useState<number>(15)
   const [travelMode, setTravelMode] = useState<TravelMode>("approximated_transit")
   const [intersection, setIntersection] = useState<GeoJSONType | null>(null)
@@ -45,6 +41,10 @@ export default function IsochroneMapPage() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [mapKey, setMapKey] = useState<number>(Date.now())
+  const [selecting, setSelecting] = useState<number | null>(null)
+
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const Map = useMemo(
     () =>
@@ -58,6 +58,40 @@ export default function IsochroneMapPage() {
       }),
     []
   )
+
+  const handleMapSelect = (coords: [number, number]) => {
+    if (selecting !== null) {
+      const newLocs = [...locations]
+      newLocs[selecting] = `${coords[0].toFixed(5)},${coords[1].toFixed(5)}`
+      setLocations(newLocs)
+      setSelecting(null)
+    }
+  }
+
+  // initialize from query params
+  useEffect(() => {
+    const locParam = searchParams.get("loc")
+    if (locParam) {
+      setLocations(locParam.split(";").map((l) => decodeURIComponent(l)))
+    }
+    const t = searchParams.get("time")
+    if (t) setTravelTime(parseInt(t))
+    const mode = searchParams.get("mode")
+    if (mode) setTravelMode(mode as TravelMode)
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (locations.length) {
+      params.set(
+        "loc",
+        locations.map((l) => encodeURIComponent(l)).join(";")
+      )
+    }
+    params.set("time", travelTime.toString())
+    params.set("mode", travelMode)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }, [locations, travelTime, travelMode])
 
   const handleLocationChange = (index: number, value: string) => {
     const newLocations = [...locations]
@@ -79,16 +113,17 @@ export default function IsochroneMapPage() {
     }
 
       //setMarkers(geocoded.map((g) => ({ position: g.coords, popup: g.name })))
-      try {
-        const intersectingIsochrone = new IntersectingIsochrone(locations, travelMode, travelTime * 60)
-        const intersectingPolygon = await intersectingIsochrone.getIntersections()
-        
-        setIntersection(intersectingPolygon.geometry)
+    try {
+        const intersectingIsochrone = new IntersectingIsochrone(
+          locations,
+          travelMode,
+          travelTime * 60,
+        )
+        const result = await intersectingIsochrone.getIntersections()
+        setIntersection(result.polygon.geometry)
+        setMarkers(result.markers)
         setMapKey(Date.now())
-        
-      
 
-      // Force map re-render
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.")
     } finally {
@@ -104,33 +139,38 @@ export default function IsochroneMapPage() {
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4 overflow-y-auto">
           <div className="space-y-4">
-            {locations.map((loc, idx) => (
-              <div key={idx} className="space-y-1.5">
-                <Label htmlFor={`location-${idx}`}>Location {idx + 1}</Label>
-                <Input
-                  id={`location-${idx}`}
-                  placeholder="e.g., Praterstern, 1020 Wien"
-                  value={loc}
-                  onChange={(e) => handleLocationChange(idx, e.target.value)}
-                />
-              </div>
-            ))}
+          {locations.map((loc, idx) => (
+            <div key={idx} className="space-y-1.5">
+              <Label htmlFor={`location-${idx}`}>Location {idx + 1}</Label>
+              <LocationInput
+                id={`location-${idx}`}
+                value={loc}
+                onChange={(val) => handleLocationChange(idx, val)}
+              />
+              <Button size="sm" variant="outline" onClick={() => setSelecting(idx)}>
+                Select on map
+              </Button>
+            </div>
+          ))}
+          <Button variant="outline" onClick={() => setLocations([...locations, ""]) } className="w-full">
+            Add Location
+          </Button>
+          {selecting !== null && (
+            <p className="text-sm text-muted-foreground">Click on the map to set location {selecting + 1}</p>
+          )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="travel-time">Travel Time</Label>
-              <Select value={travelTime.toString()} onValueChange={(val)=>setTravelTime(parseInt(val))} defaultValue="15">
-                <SelectTrigger id="travel-time">
-                  <SelectValue placeholder="Select time" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">15 minutes</SelectItem>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="45">45 minutes</SelectItem>
-                  <SelectItem value="60">60 minutes</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="travel-time">Travel Time: {travelTime} min</Label>
+              <Slider
+                id="travel-time"
+                min={1}
+                max={60}
+                step={1}
+                value={[travelTime]}
+                onValueChange={(val) => setTravelTime(val[0])}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Travel Mode</Label>
@@ -167,7 +207,13 @@ export default function IsochroneMapPage() {
       </Card>
 
       <div className="flex-grow h-1/2 lg:h-full w-full">
-        <Map key={mapKey} displayData={intersection} markers={markers} travelTime={travelTime} />
+        <Map
+          key={mapKey}
+          displayData={intersection}
+          markers={markers}
+          travelTime={travelTime}
+          onSelectLocation={handleMapSelect}
+        />
       </div>
     </div>
   )

@@ -7,7 +7,7 @@ export class IntersectingIsochrone {
   constructor(
     private adresses: string[],
     private travelMode: TravelMode,
-    private travelTimeInSeconds: number
+    private travelTimeInSeconds: number,
   ) {
     this.adresses = adresses
       .map((loc) => loc.trim())
@@ -15,7 +15,9 @@ export class IntersectingIsochrone {
   }
 
   public async getIntersections() {
-    const isochrones = await this.fetchIsochrones();  
+    const fetched = await this.fetchIsochrones();
+    const isochrones = fetched.map((f) => f.geojson);
+    const markers = fetched.map((f) => ({ position: f.coords, popup: f.name }));
     let current: ResponseFeature = isochrones[0].features[0];
 
     for (let i = 1; i < isochrones.length; i++) {
@@ -26,7 +28,7 @@ export class IntersectingIsochrone {
       }
       current = intersection;
     }
-    return current;
+    return { polygon: current, markers };
   }
 
   private getIntersection(
@@ -36,16 +38,29 @@ export class IntersectingIsochrone {
     return intersect<ResponseProperties>(featureCollection([poly1Features,poly2Features]));
   }
 
+  private parseLocation(loc: string): string | [number, number] {
+    const parts = loc.split(',');
+    if (
+      parts.length === 2 &&
+      !isNaN(parseFloat(parts[0])) &&
+      !isNaN(parseFloat(parts[1]))
+    ) {
+      return [parseFloat(parts[0]), parseFloat(parts[1])] as [number, number];
+    }
+    return loc;
+  }
+
   private fetchIsochrones = async () => {
     return await Promise.all(
       this.adresses.map(async (address) => {
+        const loc = this.parseLocation(address);
         const isochroneAPI = new IsochroneAPI(
-          address,
+          loc,
           this.travelMode,
-          this.travelTimeInSeconds
+          this.travelTimeInSeconds,
         );
         return await isochroneAPI.getIsochrone();
-      })
+      }),
     );
   };
 
