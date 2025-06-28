@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState } from "react"
-import { Input } from "@/components/ui/input"
+import { Input } from "@/components/atoms/input"
 import { MapPin, X, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
