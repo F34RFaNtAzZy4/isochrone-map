@@ -6,16 +6,9 @@ import type { GeoJSON as GeoJSONType } from "geojson";
 import L from "leaflet";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -31,6 +24,9 @@ import {
 import "leaflet/dist/leaflet.css";
 import { IntersectingIsochrone } from "@/lib/IntersectingIsochrone";
 import { TravelMode } from "@/types";
+import { useRouter, useSearchParams } from "next/navigation";
+import LocationInput from "@/components/location-input";
+import { Slider } from "@/components/ui/slider";
 
 const MODE_COLORS: Record<TravelMode, string> = {
   drive: "#1e3a8a",
@@ -68,10 +64,10 @@ export default function IsochroneMapPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [mapKey, setMapKey] = useState<number>(Date.now());
-  const [selecting, setSelecting] = useState<number | null>(null)
+  const [selecting, setSelecting] = useState<number | null>(null);
 
-  const router = useRouter()
-  const searchParams = useSearchParams()
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const Map = useMemo(
     () =>
@@ -88,37 +84,34 @@ export default function IsochroneMapPage() {
 
   const handleMapSelect = (coords: [number, number]) => {
     if (selecting !== null) {
-      const newLocs = [...locations]
-      newLocs[selecting] = `${coords[0].toFixed(5)},${coords[1].toFixed(5)}`
-      setLocations(newLocs)
-      setSelecting(null)
+      const newLocs = [...locations];
+      newLocs[selecting] = `${coords[0].toFixed(5)},${coords[1].toFixed(5)}`;
+      setLocations(newLocs);
+      setSelecting(null);
     }
-  }
+  };
 
   // initialize from query params
   useEffect(() => {
-    const locParam = searchParams.get("loc")
+    const locParam = searchParams.get("loc");
     if (locParam) {
-      setLocations(locParam.split(";").map((l) => decodeURIComponent(l)))
+      setLocations(locParam.split(";").map((l) => decodeURIComponent(l)));
     }
-    const t = searchParams.get("time")
-    if (t) setTravelTime(parseInt(t))
-    const mode = searchParams.get("mode")
-    if (mode) setTravelMode(mode as TravelMode)
-  }, [])
+    const t = searchParams.get("time");
+    if (t) setTravelTime(parseInt(t));
+    const modes = searchParams.getAll("mode");
+    if (modes) setTravelModes(modes as TravelMode[]);
+  }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams();
     if (locations.length) {
-      params.set(
-        "loc",
-        locations.map((l) => encodeURIComponent(l)).join(";")
-      )
+      params.set("loc", locations.map((l) => encodeURIComponent(l)).join(";"));
     }
-    params.set("time", travelTime.toString())
-    params.set("mode", travelMode)
-    router.replace(`?${params.toString()}`, { scroll: false })
-  }, [locations, travelTime, travelMode])
+    params.set("time", travelTime.toString());
+    params.set("mode", travelModes.join(";"));
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }, [locations, travelTime, travelModes]);
 
   const handleLocationChange = (index: number, value: string) => {
     const newLocations = [...locations];
@@ -153,7 +146,7 @@ export default function IsochroneMapPage() {
             if (!intersectingPolygon) return;
             return {
               mode,
-              geoJson: intersectingPolygon.geometry as GeoJSONType,
+              geoJson: intersectingPolygon.polygon.geometry as GeoJSONType,
               color: MODE_COLORS[mode],
             };
           })
@@ -182,99 +175,103 @@ export default function IsochroneMapPage() {
         <CardHeader>
           <CardTitle className="text-xl">Vienna Reachable Area</CardTitle>
         </CardHeader>
-        <CardContent className="flex-grow flex flex-col gap-4 overflow-y-auto">
-          <div className="space-y-4">
-          {locations.map((loc, idx) => (
-            <div key={idx} className="space-y-1.5">
-              <Label htmlFor={`location-${idx}`}>Location {idx + 1}</Label>
-              <LocationInput
-                id={`location-${idx}`}
-                value={loc}
-                onChange={(val) => handleLocationChange(idx, val)}
-                onSelectOnMap={() => setSelecting(idx)}
-              />
-            </div>
-          ))}
-          <Button variant="outline" onClick={() => setLocations([...locations, ""]) } className="w-full">
-            Add Location
-          </Button>
-          {selecting !== null && (
-            <p className="text-sm text-muted-foreground">Click on the map to set location {selecting + 1}</p>
-          )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="travel-time">Travel Time: {travelTime} min</Label>
-              <Slider
-                id="travel-time"
-                min={1}
-                max={60}
-                step={1}
-                value={[travelTime]}
-                onValueChange={(val) => setTravelTime(val[0])}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Travel Mode</Label>
-              <ToggleGroup
-                type="multiple"
-                value={travelModes}
-                onValueChange={(modes) => setTravelModes(modes as TravelMode[])}
-                className="flex items-center space-x-2 pt-2"
+        <CardContent className="flex-grow flex flex-col gap-4 space-y-2 overflow-y-auto">
+          <div className="">
+            <ToggleGroup
+              type="multiple"
+              value={travelModes}
+              onValueChange={(modes) => setTravelModes(modes as TravelMode[])}
+              className="flex items-center space-x-2 pt-2"
+            >
+              <ToggleGroupItem
+                value="drive"
+                style={{
+                  backgroundColor: travelModes.includes("drive")
+                    ? MODE_COLORS.drive
+                    : undefined,
+                  color: travelModes.includes("drive") ? "white" : undefined,
+                }}
               >
-                <ToggleGroupItem
-                  value="drive"
-                  style={{
-                    backgroundColor: travelModes.includes("drive")
-                      ? MODE_COLORS.drive
-                      : undefined,
-                    color: travelModes.includes("drive") ? "white" : undefined,
+                <Car className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="approximated_transit"
+                style={{
+                  backgroundColor: travelModes.includes("approximated_transit")
+                    ? MODE_COLORS.approximated_transit
+                    : undefined,
+                  color: travelModes.includes("approximated_transit")
+                    ? "white"
+                    : undefined,
+                }}
+              >
+                <Bus className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="bicycle"
+                style={{
+                  backgroundColor: travelModes.includes("bicycle")
+                    ? MODE_COLORS.bicycle
+                    : undefined,
+                  color: travelModes.includes("bicycle") ? "white" : undefined,
+                }}
+              >
+                <Bike className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="walk"
+                style={{
+                  backgroundColor: travelModes.includes("walk")
+                    ? MODE_COLORS.walk
+                    : undefined,
+                  color: travelModes.includes("walk") ? "white" : undefined,
+                }}
+              >
+                <Footprints className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="" htmlFor="travel-time">
+              Travel Time: {travelTime} min
+            </Label>
+            <Slider
+              id="travel-time"
+              min={1}
+              max={60}
+              step={1}
+              value={[travelTime]}
+              onValueChange={(val) => setTravelTime(val[0])}
+            />
+          </div>
+          <div className="space-y-2">
+            {locations.map((loc, idx) => (
+              <div key={idx} className="space-y-1">
+                <LocationInput
+                  id={`location-${idx}`}
+                  value={loc}
+                  onChange={(val) => handleLocationChange(idx, val)}
+                  onSelectOnMap={() => setSelecting(idx)}
+                  onDelete={() => {
+                    const newLocations = [...locations];
+                    newLocations.splice(idx, 1);
+                    setLocations(newLocations);
                   }}
-                >
-                  <Car className="h-4 w-4" />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="approximated_transit"
-                  style={{
-                    backgroundColor: travelModes.includes(
-                      "approximated_transit"
-                    )
-                      ? MODE_COLORS.approximated_transit
-                      : undefined,
-                    color: travelModes.includes("approximated_transit")
-                      ? "white"
-                      : undefined,
-                  }}
-                >
-                  <Bus className="h-4 w-4" />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="bicycle"
-                  style={{
-                    backgroundColor: travelModes.includes("bicycle")
-                      ? MODE_COLORS.bicycle
-                      : undefined,
-                    color: travelModes.includes("bicycle")
-                      ? "white"
-                      : undefined,
-                  }}
-                >
-                  <Bike className="h-4 w-4" />
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="walk"
-                  style={{
-                    backgroundColor: travelModes.includes("walk")
-                      ? MODE_COLORS.walk
-                      : undefined,
-                    color: travelModes.includes("walk") ? "white" : undefined,
-                  }}
-                >
-                  <Footprints className="h-4 w-4" />
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
+                />
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              onClick={() => setLocations([...locations, ""])}
+              className="w-full border-dashed"
+            >
+              Add Location
+            </Button>
+            {selecting !== null && (
+              <p className="text-sm text-muted-foreground">
+                Click on the map to set location {selecting + 1}
+              </p>
+            )}
           </div>
 
           <Button
