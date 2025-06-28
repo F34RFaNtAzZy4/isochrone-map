@@ -206,7 +206,7 @@ export default function IsochroneMapPage() {
     <div className="flex h-screen w-full flex-col lg:flex-row bg-background">
       <Card className="w-full lg:w-[380px] lg:h-full lg:border-r lg:rounded-none flex flex-col">
         <CardHeader>
-          <CardTitle className="text-xl">Vienna Reachable Area</CardTitle>
+          <CardTitle className="text-xl">Reachable Area</CardTitle>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4 space-y-2 overflow-y-auto">
           <div className="">
