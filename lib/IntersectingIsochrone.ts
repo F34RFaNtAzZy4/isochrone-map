@@ -22,7 +22,7 @@ export class IntersectingIsochrone {
       const next = isochrones[i].features[0];
       const intersection = this.getIntersection(current, next);
       if (!intersection) {
-        throw new Error("No intersection found between isochrones.");
+        return null;
       }
       current = intersection;
     }
