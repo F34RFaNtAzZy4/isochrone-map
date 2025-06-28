@@ -92,3 +92,8 @@ body {
     @apply bg-background text-foreground;
   }
 }
+@layer utilities {
+  .cursor-marker {
+    cursor: url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27black%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cline%20x1%3D%272%27%20x2%3D%275%27%20y1%3D%2712%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2719%27%20x2%3D%2722%27%20y1%3D%2712%27%20y2%3D%2712%27%2F%3E%3Cline%20x1%3D%2712%27%20x2%3D%2712%27%20y1%3D%272%27%20y2%3D%275%27%2F%3E%3Cline%20x1%3D%2712%27%20x2%3D%2712%27%20y1%3D%2719%27%20y2%3D%2722%27%2F%3E%3Ccircle%20cx%3D%2712%27%20cy%3D%2712%27%20r%3D%277%27%2F%3E%3C%2Fsvg%3E') 12 12, pointer;
+  }
+}

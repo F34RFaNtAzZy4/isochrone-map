@@ -1,11 +1,12 @@
 "use client"
 
-import { MapContainer, TileLayer, GeoJSON, Marker, Popup, Tooltip, useMap } from "react-leaflet"
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet"
 import type { GeoJSON as GeoJSONType } from "geojson"
 import type { LatLngBoundsExpression } from "leaflet"
 import { TravelMode } from "@/types"
 import { useEffect } from "react"
 import L from "leaflet"
+import { cn } from "@/lib/utils"
 
 interface IsochroneDisplay {
   geoJson: GeoJSONType
@@ -17,6 +18,8 @@ interface MapDisplayProps {
   displayData: IsochroneDisplay[]
   markers: { position: [number, number]; popup: string }[]
   travelTime: number
+  onSelectLocation?: (coords: [number, number]) => void
+  selecting?: boolean
 }
 
 const viennaBounds: LatLngBoundsExpression = [
@@ -37,14 +40,29 @@ function ChangeView({ markers }: { markers: { position: [number, number] }[] }) 
   return null
 }
 
-export default function MapDisplay({ displayData, markers, travelTime }: MapDisplayProps) {
+function ClickHandler({ onSelectLocation }: { onSelectLocation?: (coords: [number, number]) => void }) {
+  useMapEvents({
+    click: (e) => {
+      onSelectLocation && onSelectLocation([e.latlng.lat, e.latlng.lng])
+    },
+  })
+  return null
+}
+
+export default function MapDisplay({ displayData, markers, travelTime, onSelectLocation, selecting }: MapDisplayProps) {
   return (
-    <MapContainer center={[48.2082, 16.3738]} zoom={12} scrollWheelZoom={true} className="h-full w-full z-0">
+    <MapContainer
+      center={[48.2082, 16.3738]}
+      zoom={12}
+      scrollWheelZoom={true}
+      className={cn('h-full w-full z-0', selecting && 'cursor-marker')}
+    >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
       />
       <ChangeView markers={markers} />
+      <ClickHandler onSelectLocation={onSelectLocation} />
 
       {displayData.map((iso) => (
         <GeoJSON

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { GeoJSON as GeoJSONType } from "geojson";
 import L from "leaflet";
@@ -54,11 +54,7 @@ L.Icon.Default.mergeOptions({
 });
 
 export default function IsochroneMapPage() {
-  const [locations, setLocations] = useState<string[]>([
-    "Stephansplatz 1, 1010 Wien",
-    "Westbahnhof, 1150 Wien",
-    "",
-  ]);
+  const [locations, setLocations] = useState<string[]>([""]);
   const [travelTime, setTravelTime] = useState<number>(15);
   const [travelModes, setTravelModes] = useState<TravelMode[]>([
     "approximated_transit",
@@ -72,6 +68,10 @@ export default function IsochroneMapPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [mapKey, setMapKey] = useState<number>(Date.now());
+  const [selecting, setSelecting] = useState<number | null>(null)
+
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
   const Map = useMemo(
     () =>
@@ -85,6 +85,40 @@ export default function IsochroneMapPage() {
       }),
     []
   );
+
+  const handleMapSelect = (coords: [number, number]) => {
+    if (selecting !== null) {
+      const newLocs = [...locations]
+      newLocs[selecting] = `${coords[0].toFixed(5)},${coords[1].toFixed(5)}`
+      setLocations(newLocs)
+      setSelecting(null)
+    }
+  }
+
+  // initialize from query params
+  useEffect(() => {
+    const locParam = searchParams.get("loc")
+    if (locParam) {
+      setLocations(locParam.split(";").map((l) => decodeURIComponent(l)))
+    }
+    const t = searchParams.get("time")
+    if (t) setTravelTime(parseInt(t))
+    const mode = searchParams.get("mode")
+    if (mode) setTravelMode(mode as TravelMode)
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (locations.length) {
+      params.set(
+        "loc",
+        locations.map((l) => encodeURIComponent(l)).join(";")
+      )
+    }
+    params.set("time", travelTime.toString())
+    params.set("mode", travelMode)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }, [locations, travelTime, travelMode])
 
   const handleLocationChange = (index: number, value: string) => {
     const newLocations = [...locations];
@@ -150,37 +184,36 @@ export default function IsochroneMapPage() {
         </CardHeader>
         <CardContent className="flex-grow flex flex-col gap-4 overflow-y-auto">
           <div className="space-y-4">
-            {locations.map((loc, idx) => (
-              <div key={idx} className="space-y-1.5">
-                <Label htmlFor={`location-${idx}`}>Location {idx + 1}</Label>
-                <Input
-                  id={`location-${idx}`}
-                  placeholder="e.g., Praterstern, 1020 Wien"
-                  value={loc}
-                  onChange={(e) => handleLocationChange(idx, e.target.value)}
-                />
-              </div>
-            ))}
+          {locations.map((loc, idx) => (
+            <div key={idx} className="space-y-1.5">
+              <Label htmlFor={`location-${idx}`}>Location {idx + 1}</Label>
+              <LocationInput
+                id={`location-${idx}`}
+                value={loc}
+                onChange={(val) => handleLocationChange(idx, val)}
+                onSelectOnMap={() => setSelecting(idx)}
+              />
+            </div>
+          ))}
+          <Button variant="outline" onClick={() => setLocations([...locations, ""]) } className="w-full">
+            Add Location
+          </Button>
+          {selecting !== null && (
+            <p className="text-sm text-muted-foreground">Click on the map to set location {selecting + 1}</p>
+          )}
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="travel-time">Travel Time</Label>
-              <Select
-                value={travelTime.toString()}
-                onValueChange={(val) => setTravelTime(parseInt(val))}
-                defaultValue="15"
-              >
-                <SelectTrigger id="travel-time">
-                  <SelectValue placeholder="Select time" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">15 minutes</SelectItem>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="45">45 minutes</SelectItem>
-                  <SelectItem value="60">60 minutes</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="travel-time">Travel Time: {travelTime} min</Label>
+              <Slider
+                id="travel-time"
+                min={1}
+                max={60}
+                step={1}
+                value={[travelTime]}
+                onValueChange={(val) => setTravelTime(val[0])}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Travel Mode</Label>
@@ -273,6 +306,8 @@ export default function IsochroneMapPage() {
           displayData={intersection}
           markers={markers}
           travelTime={travelTime}
+          onSelectLocation={handleMapSelect}
+          selecting={selecting !== null}
         />
       </div>
     </div>
