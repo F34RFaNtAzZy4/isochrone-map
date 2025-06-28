@@ -3,7 +3,6 @@
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { GeoJSON as GeoJSONType } from "geojson";
-import L from "leaflet";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -35,19 +34,6 @@ const MODE_COLORS: Record<TravelMode, string> = {
   walk: "#ea580c",
 };
 
-// Leaflet icon workaround for Next.js using CDN
-// @ts-ignore
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41],
-});
 
 export default function IsochroneMapPage() {
   const [locations, setLocations] = useState<string[]>([""]);
@@ -68,6 +54,49 @@ export default function IsochroneMapPage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    async function configureLeaflet() {
+      const L = await import('leaflet');
+      // @ts-ignore
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl:
+          'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41],
+      });
+    }
+    if (typeof window !== 'undefined') {
+      configureLeaflet();
+    }
+  }, []);
+
+  const parseCoords = (loc: string): [number, number] | null => {
+    const parts = loc.split(',');
+    if (parts.length === 2) {
+      const lat = parseFloat(parts[0]);
+      const lon = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        return [lat, lon];
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    const newMarkers = locations
+      .map((loc, idx) => {
+        const coords = parseCoords(loc);
+        return coords ? { position: coords, popup: `Location ${idx + 1}` } : null;
+      })
+      .filter((m): m is { position: [number, number]; popup: string } => m !== null);
+    setMarkers(newMarkers);
+  }, [locations]);
 
   const Map = useMemo(
     () =>
@@ -148,6 +177,7 @@ export default function IsochroneMapPage() {
               mode,
               geoJson: intersectingPolygon.polygon.geometry as GeoJSONType,
               color: MODE_COLORS[mode],
+              markers: intersectingPolygon.markers,
             };
           })
         )
@@ -159,6 +189,9 @@ export default function IsochroneMapPage() {
         );
 
       setIntersection(results);
+      if (results[0]) {
+        setMarkers(results[0].markers);
+      }
       setMapKey(Date.now());
     } catch (err) {
       setError(
