@@ -1,5 +1,5 @@
 "use client"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { ToggleGroup, ToggleGroupItem } from "@/components/atoms/toggle-group"
 import { Car, Bus, Bike, Footprints } from "lucide-react"
 import { TravelMode } from "@/types"
 

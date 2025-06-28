@@ -1,6 +1,6 @@
 "use client"
 import LocationInput from "@/components/location-input"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/atoms/button"
 
 interface Props {
   locations: string[]
