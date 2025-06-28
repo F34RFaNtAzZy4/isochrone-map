@@ -10,14 +10,20 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, MapPin, AlertCircle } from "lucide-react"
+import { Loader2, MapPin, AlertCircle, Car, Bus, Bike, Footprints } from "lucide-react"
 
 import "leaflet/dist/leaflet.css"
 import { IntersectingIsochrone } from "@/lib/IntersectingIsochrone"
 import { TravelMode } from "@/types"
-import { featureCollection } from "@turf/turf"
+
+const MODE_COLORS: Record<TravelMode, string> = {
+  drive: "#1e3a8a",
+  approximated_transit: "#7e22ce",
+  bicycle: "#15803d",
+  walk: "#ea580c",
+}
 
 // Leaflet icon workaround for Next.js using CDN
 // @ts-ignore
@@ -39,8 +45,8 @@ export default function IsochroneMapPage() {
     "",
   ])
   const [travelTime, setTravelTime] = useState<number>(15)
-  const [travelMode, setTravelMode] = useState<TravelMode>("approximated_transit")
-  const [intersection, setIntersection] = useState<GeoJSONType | null>(null)
+  const [travelModes, setTravelModes] = useState<TravelMode[]>(["approximated_transit"])
+  const [intersection, setIntersection] = useState<{mode: TravelMode; geoJson: GeoJSONType; color: string}[]>([])
   const [markers, setMarkers] = useState<{ position: [number, number]; popup: string }[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +74,7 @@ export default function IsochroneMapPage() {
   const handleSubmit = async () => {
     setLoading(true)
     setError(null)
-    setIntersection(null)
+    setIntersection([])
     setMarkers([])
 
     const validLocations = locations.filter((loc) => loc.trim() !== "")
@@ -78,17 +84,17 @@ export default function IsochroneMapPage() {
       return
     }
 
-      //setMarkers(geocoded.map((g) => ({ position: g.coords, popup: g.name })))
-      try {
-        const intersectingIsochrone = new IntersectingIsochrone(locations, travelMode, travelTime * 60)
-        const intersectingPolygon = await intersectingIsochrone.getIntersections()
-        
-        setIntersection(intersectingPolygon.geometry)
-        setMapKey(Date.now())
-        
-      
+    try {
+      const results = await Promise.all(
+        travelModes.map(async (mode) => {
+          const intersectingIsochrone = new IntersectingIsochrone(locations, mode, travelTime * 60)
+          const intersectingPolygon = await intersectingIsochrone.getIntersections()
+          return { mode, geoJson: intersectingPolygon.geometry as GeoJSONType, color: MODE_COLORS[mode] }
+        })
+      )
 
-      // Force map re-render
+      setIntersection(results)
+      setMapKey(Date.now())
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unexpected error occurred.")
     } finally {
@@ -134,20 +140,49 @@ export default function IsochroneMapPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Travel Mode</Label>
-              <RadioGroup
-                value={travelMode}
-                onValueChange={(mode:TravelMode)=>setTravelMode(mode)}
-                className="flex items-center space-x-4 pt-2"
+              <ToggleGroup
+                type="multiple"
+                value={travelModes}
+                onValueChange={(modes) => setTravelModes(modes as TravelMode[])}
+                className="flex items-center space-x-2 pt-2"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="approximated_transit" id="transit" />
-                  <Label htmlFor="transit">Public</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="walk" id="walk" />
-                  <Label htmlFor="walk">Walk</Label>
-                </div>
-              </RadioGroup>
+                <ToggleGroupItem
+                  value="drive"
+                  style={{
+                    backgroundColor: travelModes.includes("drive") ? MODE_COLORS.drive : undefined,
+                    color: travelModes.includes("drive") ? "white" : undefined,
+                  }}
+                >
+                  <Car className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="approximated_transit"
+                  style={{
+                    backgroundColor: travelModes.includes("approximated_transit") ? MODE_COLORS.approximated_transit : undefined,
+                    color: travelModes.includes("approximated_transit") ? "white" : undefined,
+                  }}
+                >
+                  <Bus className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="bicycle"
+                  style={{
+                    backgroundColor: travelModes.includes("bicycle") ? MODE_COLORS.bicycle : undefined,
+                    color: travelModes.includes("bicycle") ? "white" : undefined,
+                  }}
+                >
+                  <Bike className="h-4 w-4" />
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="walk"
+                  style={{
+                    backgroundColor: travelModes.includes("walk") ? MODE_COLORS.walk : undefined,
+                    color: travelModes.includes("walk") ? "white" : undefined,
+                  }}
+                >
+                  <Footprints className="h-4 w-4" />
+                </ToggleGroupItem>
+              </ToggleGroup>
             </div>
           </div>
 

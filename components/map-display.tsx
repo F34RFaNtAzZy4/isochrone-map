@@ -3,11 +3,18 @@
 import { MapContainer, TileLayer, GeoJSON, Marker, Popup, Tooltip, useMap } from "react-leaflet"
 import type { GeoJSON as GeoJSONType } from "geojson"
 import type { LatLngBoundsExpression } from "leaflet"
+import { TravelMode } from "@/types"
 import { useEffect } from "react"
 import L from "leaflet"
 
+interface IsochroneDisplay {
+  geoJson: GeoJSONType
+  color: string
+  mode: TravelMode
+}
+
 interface MapDisplayProps {
-  displayData: GeoJSONType | null
+  displayData: IsochroneDisplay[]
   markers: { position: [number, number]; popup: string }[]
   travelTime: number
 }
@@ -39,14 +46,15 @@ export default function MapDisplay({ displayData, markers, travelTime }: MapDisp
       />
       <ChangeView markers={markers} />
 
-      {displayData && (
+      {displayData.map((iso) => (
         <GeoJSON
-          data={displayData}
+          key={iso.mode}
+          data={iso.geoJson}
           style={{
-            color: "#e60000",
+            color: iso.color,
             weight: 2,
             opacity: 0.9,
-            fillColor: "#ff4d4d",
+            fillColor: iso.color,
             fillOpacity: 0.4,
             className: "isochrone-path",
           }}
@@ -57,7 +65,7 @@ export default function MapDisplay({ displayData, markers, travelTime }: MapDisp
               : `Reachable area within ${travelTime} minutes`}
           </Tooltip>
         </GeoJSON>
-      )}
+      ))}
 
       {markers.map((marker, index) => (
         <Marker key={index} position={marker.position}>
