@@ -123,7 +123,7 @@ export default function IsochroneMapPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="travel-time">Travel Time</Label>
               <Select value={travelTime.toString()} onValueChange={(val)=>setTravelTime(parseInt(val))} defaultValue="15">
